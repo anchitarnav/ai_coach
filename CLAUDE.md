@@ -6,6 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 AI Career Coach — a desktop app (macOS) that acts as a personal AI career coach for professionals and leaders. Uses PydanticAI for the AI agent, Flet for the UI, and SQLite for storage. See `README.md` for full user-facing documentation.
 
+## CLI Coaching Mode
+
+This project also functions as a Claude Code-powered career coach via skills and a shared database.
+
+- `/coach-mode` — activates coaching persona for the full session (extended coaching)
+- Individual skills (`/coach-goals`, `/coach-journal`, `/coach-reflect`, `/coach-memory`, `/coach-notes`, `/coach-commitments`, `/coach-nudges`, `/coach-check-in`, `/coach-weekly-review`) — work standalone for quick interactions
+
+Both access the same SQLite database (`~/.ai_coach/data.db`) as the desktop app via `cli/db.py`.
+Default mode is developer/coder — for working on the app itself. Coaching persona only activates when explicitly invoked.
+
 ## Tech Stack
 
 - **UI**: Flet 0.81+ (Python, Flutter-backed) — `import flet as ft`, entry point `ft.run(main)`

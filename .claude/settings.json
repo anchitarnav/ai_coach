@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 cli/hooks/session_start.py",
+            "timeout": 10000
+          }
+        ]
+      }
+    ]
+  }
+}

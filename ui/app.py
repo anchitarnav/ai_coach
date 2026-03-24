@@ -10,6 +10,7 @@ from ui.views.chat import ChatView
 from ui.views.goals import GoalsView
 from ui.views.memory import MemoryView
 from ui.views.diary import DiaryView
+from ui.views.notes import NotesView
 from ui.views.notifications import NotificationsView
 from ui.views.settings import SettingsView
 
@@ -19,11 +20,12 @@ NAV_ITEMS = [
     ("Goals",         ft.Icons.FLAG_OUTLINED,             ft.Icons.FLAG),
     ("Memory",        ft.Icons.PSYCHOLOGY_OUTLINED,       ft.Icons.PSYCHOLOGY),
     ("Diary",         ft.Icons.BOOK_OUTLINED,             ft.Icons.BOOK),
+    ("Notes",         ft.Icons.DESCRIPTION_OUTLINED,      ft.Icons.DESCRIPTION),
     ("Notifications", ft.Icons.NOTIFICATIONS_OUTLINED,    ft.Icons.NOTIFICATIONS),
     ("Settings",      ft.Icons.SETTINGS_OUTLINED,         ft.Icons.SETTINGS),
 ]
 
-NOTIF_INDEX = 4
+NOTIF_INDEX = 5
 
 
 class CoachApp:
@@ -169,7 +171,7 @@ class CoachApp:
 
     def _init_all_views(self):
         """Pre-create all views so tab switching is instant."""
-        factories = [ChatView, GoalsView, MemoryView, DiaryView, NotificationsView, SettingsView]
+        factories = [ChatView, GoalsView, MemoryView, DiaryView, NotesView, NotificationsView, SettingsView]
         for idx, factory in enumerate(factories):
             self._views[idx] = factory(self.page)
 

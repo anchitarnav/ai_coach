@@ -67,6 +67,7 @@ _SCHEMA_STATEMENTS = [
         date DATE NOT NULL,
         content TEXT NOT NULL,
         mood TEXT NOT NULL DEFAULT '',
+        title TEXT NOT NULL DEFAULT '',
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )""",
     """CREATE TABLE IF NOT EXISTS settings (
@@ -111,6 +112,15 @@ _SCHEMA_STATEMENTS = [
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         completed_at TIMESTAMP
     )""",
+    """CREATE TABLE IF NOT EXISTS notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL DEFAULT '',
+        tags TEXT NOT NULL DEFAULT '',
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_notes_updated ON notes(updated_at)",
 ]
 
 
@@ -137,5 +147,31 @@ async def _init_schema(db: aiosqlite.Connection):
             INSERT INTO memories_fts(rowid, content, tags)
             SELECT id, content, tags FROM memories
         """)
+
+    # FTS5 virtual table for notes search
+    cursor = await db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='notes_fts'"
+    )
+    if await cursor.fetchone() is None:
+        await db.execute("""
+            CREATE VIRTUAL TABLE notes_fts USING fts5(
+                title,
+                content,
+                tags,
+                content_rowid='id',
+                tokenize='porter'
+            )
+        """)
+        # Populate FTS from any existing data
+        await db.execute("""
+            INSERT INTO notes_fts(rowid, title, content, tags)
+            SELECT id, title, content, tags FROM notes
+        """)
+
+    # Migration: add title column to diary_entries (for existing DBs)
+    cursor = await db.execute("PRAGMA table_info(diary_entries)")
+    columns = [row[1] for row in await cursor.fetchall()]
+    if "title" not in columns:
+        await db.execute("ALTER TABLE diary_entries ADD COLUMN title TEXT NOT NULL DEFAULT ''")
 
     await db.commit()

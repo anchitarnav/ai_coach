@@ -2,6 +2,7 @@
 
 import flet as ft
 from services.llm_manager import detect_providers, get_available_models, set_api_key, PROVIDERS
+from services.notifications import send_notification
 from storage import settings as settings_db
 from ui import theme
 
@@ -89,6 +90,21 @@ class SettingsView(ft.Column):
                             spacing=12,
                         ),
                         self.heartbeat_dropdown,
+
+                        theme.section_divider(),
+
+                        # ── Test notifications section ──────────────
+                        theme.subheading("Notifications", size=17),
+                        ft.Text(
+                            "Send a test notification to verify macOS notifications are working.",
+                            size=13, color=theme.TEXT_SECONDARY,
+                        ),
+                        ft.Button(
+                            "Send Test Notification",
+                            icon=ft.Icons.NOTIFICATIONS_ACTIVE,
+                            on_click=self._on_test_notification,
+                            color="#FFFFFF", bgcolor=theme.PRIMARY,
+                        ),
                     ],
                 ),
                 padding=ft.Padding(left=theme.PAGE_PAD, right=theme.PAGE_PAD, top=theme.PAGE_PAD, bottom=40),
@@ -196,3 +212,16 @@ class SettingsView(ft.Column):
         val = self.heartbeat_dropdown.value
         if val:
             await settings_db.set("heartbeat_interval", val)
+
+    async def _on_test_notification(self, e):
+        ok, detail = await send_notification(
+            "AI Career Coach",
+            "Notifications are working! You'll receive coaching nudges here.",
+        )
+        if ok:
+            self.status_text.value = "Test notification sent — check your notification center."
+            self.status_text.color = theme.SUCCESS
+        else:
+            self.status_text.value = f"Notification failed: {detail}"
+            self.status_text.color = theme.ERROR
+        self.update()

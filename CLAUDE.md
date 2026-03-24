@@ -27,9 +27,25 @@ flet run main.py
 # Run (direct)
 python3 main.py
 
-# Package for macOS
+# Package for macOS (two-step process)
+# Step 1: Generate the Flutter project (run once, or after dependency changes)
 flet build macos
+# Step 2: Build the .app from the generated Flutter project
+cd build/flutter && flutter build macos --build-name 0.1.0 --no-version-check --suppress-analytics
+# Step 3: Re-sign (needed if code signing is incomplete)
+codesign --force --deep --sign - build/flutter/build/macos/Build/Products/Release/ai-coach.app
+# Step 4: Copy to release folder
+cp -R build/flutter/build/macos/Build/Products/Release/ai-coach.app release/
 ```
+
+### Packaging notes
+
+- `flet build macos` generates a Flutter project under `build/flutter/` but can hang with no output.
+  Use `flutter build macos` from `build/flutter/` directly for verbose progress (`-v` flag).
+- The build bundles all Python site-packages into `serious_python_darwin.framework` — this is slow (10+ min).
+- After building, the app may fail to launch with `RBSRequestErrorDomain Code=5` — fix with `codesign --force --deep --sign -`.
+- Release binary: `release/ai-coach.app`
+- Flutter SDK must be on PATH: `export PATH="/Users/anchita/flutter/3.41.2/bin:$PATH"`
 
 ## Architecture
 
@@ -37,12 +53,13 @@ flet build macos
 main.py                        → Flet app entry point, DB init, API key restore from settings
 ├── ui/
 │   ├── theme.py               → Design system: colors, spacing, typography helpers, card/pill builders
-│   ├── app.py                 → App shell: 6-tab sidebar, nudge banner, badge, CoachLoop startup
+│   ├── app.py                 → App shell: 7-tab sidebar, nudge banner, badge, CoachLoop startup
 │   ├── views/
 │   │   ├── chat.py            → Conversation sidebar + streaming chat, nudge-driven chats
 │   │   ├── goals.py           → CRUD for career goals (priority pills, category badges, archive)
 │   │   ├── memory.py          → Browse/search (FTS5)/add/delete memories, source badges
 │   │   ├── diary.py           → Daily entries with mood tags, markdown rendering
+│   │   ├── notes.py           → Reference notes: titled docs with FTS5 search, tags, CRUD
 │   │   ├── notifications.py   → Pending nudges with actions + history, snooze/dismiss/talk
 │   │   └── settings.py        → Provider config, model selection, proactive coaching settings
 │   └── components/
@@ -51,7 +68,7 @@ main.py                        → Flet app entry point, DB init, API key restor
 ├── agent/
 │   ├── coach.py               → create_coach_agent() and create_memory_extractor() factories
 │   ├── proactive.py           → create_proactive_agent() — structured output (ProactiveDecision)
-│   ├── tools.py               → 9 tools: goals, memories, diary, today_info, commitments, followups
+│   ├── tools.py               → 11 tools: goals, memories, diary, notes, today_info, commitments, followups
 │   ├── prompts.py             → COACHING_SYSTEM_PROMPT, MEMORY_EXTRACTION_PROMPT, PROACTIVE_SYSTEM_PROMPT
 │   └── models.py              → MemoryItem, MemoryExtraction, NudgeAction, ScheduledTask, ProactiveDecision
 ├── storage/
@@ -59,6 +76,7 @@ main.py                        → Flet app entry point, DB init, API key restor
 │   ├── goals.py               → get_active(), get_all(), create(), update(), delete()
 │   ├── memory.py              → get_all(), get_recent(), search(), create(), update(), delete()
 │   ├── diary.py               → get_all(), get_recent(), get_by_date(), create(), update(), delete()
+│   ├── notes.py               → get_all(), get_by_id(), search(), create(), update(), delete()
 │   ├── conversations.py       → get_all(), create(), get_messages(), add_message(), delete()
 │   ├── settings.py            → get(), set(), get_json(), set_json(), delete(), get_all()
 │   ├── scheduled_tasks.py     → get_pending(), create(), update_status(), cancel()
@@ -98,7 +116,7 @@ When adding new UI, always use `theme.card()` for card containers, `theme.pill()
 
 ## Database
 
-SQLite at `~/.ai_coach/data.db` with tables: `goals`, `memories`, `diary_entries`, `conversations`, `messages`, `settings`, `scheduled_tasks`, `nudges`, `commitments`. FTS5 virtual table `memories_fts` for full-text memory search (Porter stemming tokenizer). Schema auto-created on first run. Delete the file to start fresh (must also delete `-shm` and `-wal` files when using WAL mode).
+SQLite at `~/.ai_coach/data.db` with tables: `goals`, `memories`, `diary_entries`, `notes`, `conversations`, `messages`, `settings`, `scheduled_tasks`, `nudges`, `commitments`. FTS5 virtual tables `memories_fts` and `notes_fts` for full-text search (Porter stemming tokenizer). Schema auto-created on first run. Delete the file to start fresh (must also delete `-shm` and `-wal` files when using WAL mode).
 
 Coach loop logs to `~/.ai_coach/coach_loop.log` for debugging.
 
@@ -151,10 +169,11 @@ These are hard-won lessons from debugging. **Do not revert to the old patterns.*
 - macOS native notifications via osascript
 - Nudge-driven chats: "Let's talk" opens a pre-contextualized coaching conversation
 - Proactive coaching settings: enable/disable, quiet hours, heartbeat interval
+- Notes: persistent reference documents with titles, tags, FTS5 search, agent integration
 
 **Not yet implemented (from original plan):**
 - Ollama / local model support (PydanticAI supports it natively — easy to add)
 - Vector search for memory (currently FTS5 only)
 - Calendar integration via MCP
 - Data export (goals/memories/diary as markdown)
-- macOS packaging tested (`flet build macos` command exists but hasn't been validated)
+- macOS packaging validated — see Commands section for build steps; release binary at `release/ai-coach.app`

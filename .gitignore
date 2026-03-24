@@ -18,6 +18,7 @@ build/
 
 # Flet build output
 build/
+release/
 
 # Database (local user data, not committed)
 *.db

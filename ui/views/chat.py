@@ -20,6 +20,8 @@ _TOOL_LABELS = {
     "create_commitment": "Tracking a commitment",
     "get_pending_commitments": "Reviewing commitments",
     "schedule_followup": "Scheduling follow-up",
+    "search_notes": "Searching notes",
+    "get_note_by_id": "Reading a note",
 }
 
 
@@ -245,6 +247,8 @@ class ChatView(ft.Column):
         self.update()
 
     async def _switch_conversation(self, conversation_id: int):
+        self.is_responding = False
+        self.send_btn.disabled = False
         self.conversation_id = conversation_id
         messages = await conv_db.get_messages(conversation_id)
         self.chat_list.controls.clear()
@@ -256,6 +260,8 @@ class ChatView(ft.Column):
     async def _delete_conversation(self, conversation_id: int):
         await conv_db.delete(conversation_id)
         if self.conversation_id == conversation_id:
+            self.is_responding = False
+            self.send_btn.disabled = False
             self.conversation_id = None
             self.chat_list.controls.clear()
             self._chat_content.controls[0] = self.welcome
@@ -279,6 +285,8 @@ class ChatView(ft.Column):
             self.conversation_id = await conv_db.create(title=text[:50], model_used=model or "")
             await self._load_conversations()
 
+        my_conv = self.conversation_id
+
         self._show_chat_list()
         self.chat_list.controls.append(message_bubble("user", text))
         self.input_field.value = ""
@@ -287,13 +295,13 @@ class ChatView(ft.Column):
         self.status_text.value = ""
         self.update()
 
-        await conv_db.add_message(self.conversation_id, "user", text)
+        await conv_db.add_message(my_conv, "user", text)
 
         try:
             model = await settings_db.get("default_model")
             agent = create_coach_agent(model)
 
-            history_msgs = await conv_db.get_messages(self.conversation_id)
+            history_msgs = await conv_db.get_messages(my_conv)
             from pydantic_ai.messages import ModelRequest, ModelResponse, UserPromptPart, TextPart
             message_history = []
             for msg in history_msgs[:-1]:
@@ -312,6 +320,8 @@ class ChatView(ft.Column):
             async with agent.iter(text, message_history=message_history) as agent_run:
                 node = agent_run.next_node
                 while not agent.is_end_node(node):
+                    if self.conversation_id != my_conv:
+                        return  # user switched away — stop updating UI
                     if agent.is_call_tools_node(node):
                         # Show which tools are being called
                         tool_calls = node.model_response.tool_calls
@@ -325,19 +335,25 @@ class ChatView(ft.Column):
                     node = await agent_run.next(node)
                 response_text = agent_run.result.output
 
-            # Replace thinking indicator with the actual response
+            # Always save the response to the correct conversation
+            await conv_db.add_message(my_conv, "assistant", response_text)
+
+            # Only update UI if still viewing the same conversation
+            if self.conversation_id != my_conv:
+                return
+
             idx = self.chat_list.controls.index(thinking_container)
             self.chat_list.controls[idx] = message_bubble("assistant", response_text)
             self.update()
 
-            await conv_db.add_message(self.conversation_id, "assistant", response_text)
-
             if len(history_msgs) <= 1:
                 title = text[:50] + ("..." if len(text) > 50 else "")
-                await conv_db.update_title(self.conversation_id, title)
+                await conv_db.update_title(my_conv, title)
                 await self._load_conversations()
 
         except Exception as ex:
+            if self.conversation_id != my_conv:
+                return
             self.chat_list.controls.append(
                 ft.Container(
                     content=ft.Text(f"Error: {ex}", color=theme.ERROR, size=13),
@@ -345,10 +361,11 @@ class ChatView(ft.Column):
                 )
             )
         finally:
-            self.is_responding = False
-            self.send_btn.disabled = False
-            self.status_text.value = ""
-            self.update()
+            if self.conversation_id == my_conv:
+                self.is_responding = False
+                self.send_btn.disabled = False
+                self.status_text.value = ""
+                self.update()
 
     async def end_conversation(self):
         if self.conversation_id is None:
@@ -368,6 +385,8 @@ class ChatView(ft.Column):
         self.conversation_id = await conv_db.create(
             title="Coach Check-in", model_used=model or ""
         )
+        my_conv = self.conversation_id
+
         self.chat_list.controls.clear()
         self._show_chat_list()
         await self._load_conversations()
@@ -387,6 +406,8 @@ class ChatView(ft.Column):
             async with agent.iter(prompt) as agent_run:
                 node = agent_run.next_node
                 while not agent.is_end_node(node):
+                    if self.conversation_id != my_conv:
+                        return
                     if agent.is_call_tools_node(node):
                         tool_calls = node.model_response.tool_calls
                         if tool_calls:
@@ -399,13 +420,18 @@ class ChatView(ft.Column):
                     node = await agent_run.next(node)
                 response_text = agent_run.result.output
 
+            await conv_db.add_message(my_conv, "assistant", response_text)
+
+            if self.conversation_id != my_conv:
+                return
+
             idx = self.chat_list.controls.index(thinking_container)
             self.chat_list.controls[idx] = message_bubble("assistant", response_text)
             self.update()
 
-            await conv_db.add_message(self.conversation_id, "assistant", response_text)
-
         except Exception as ex:
+            if self.conversation_id != my_conv:
+                return
             self.chat_list.controls.append(
                 ft.Container(
                     content=ft.Text(f"Error: {ex}", color=theme.ERROR, size=13),
@@ -413,6 +439,7 @@ class ChatView(ft.Column):
                 )
             )
         finally:
-            self.is_responding = False
-            self.send_btn.disabled = False
-            self.update()
+            if self.conversation_id == my_conv:
+                self.is_responding = False
+                self.send_btn.disabled = False
+                self.update()

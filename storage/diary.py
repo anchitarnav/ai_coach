@@ -43,23 +43,25 @@ async def get_by_id(entry_id: int) -> dict | None:
     return dict(row) if row else None
 
 
-async def create(entry_date: date, content: str, mood: str = "") -> int:
+async def create(entry_date: date, content: str, mood: str = "", title: str = "") -> int:
     db = await get_db()
     cursor = await db.execute(
-        "INSERT INTO diary_entries (date, content, mood) VALUES (?, ?, ?)",
-        (entry_date.isoformat(), content, mood),
+        "INSERT INTO diary_entries (date, content, mood, title) VALUES (?, ?, ?, ?)",
+        (entry_date.isoformat(), content, mood, title),
     )
     await db.commit()
     return cursor.lastrowid
 
 
-async def update(entry_id: int, content: str | None = None, mood: str | None = None) -> None:
+async def update(entry_id: int, content: str | None = None, mood: str | None = None, title: str | None = None) -> None:
     db = await get_db()
     updates = {}
     if content is not None:
         updates["content"] = content
     if mood is not None:
         updates["mood"] = mood
+    if title is not None:
+        updates["title"] = title
     if not updates:
         return
     set_clause = ", ".join(f"{k} = ?" for k in updates)

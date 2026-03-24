@@ -33,6 +33,29 @@ class ScheduledTask(BaseModel):
     related_goal_id: int | None = Field(default=None)
 
 
+class CommitmentItem(BaseModel):
+    what: str = Field(description="What the user committed to doing")
+    due_date: str | None = Field(default=None, description="Due date in YYYY-MM-DD format, if mentioned")
+
+
+class FollowUpItem(BaseModel):
+    context: str = Field(description="What the coach should follow up about")
+    wake_at: str = Field(description="ISO timestamp for when to follow up")
+
+
+class DiaryProcessing(BaseModel):
+    title: str = Field(description="Short descriptive title for the diary entry (5-8 words)")
+    memories: list[MemoryItem] = Field(
+        default_factory=list, description="Important memories worth saving from this entry"
+    )
+    commitments: list[CommitmentItem] = Field(
+        default_factory=list, description="Things the user said they'd do"
+    )
+    follow_ups: list[FollowUpItem] = Field(
+        default_factory=list, description="Things the coach should proactively check back on"
+    )
+
+
 class ProactiveDecision(BaseModel):
     nudges: list[NudgeAction] = Field(default_factory=list)
     schedule: list[ScheduledTask] = Field(default_factory=list)

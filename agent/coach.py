@@ -4,8 +4,8 @@ from datetime import date
 
 from pydantic_ai import Agent
 
-from agent.prompts import COACHING_SYSTEM_PROMPT, MEMORY_EXTRACTION_PROMPT
-from agent.models import MemoryExtraction
+from agent.prompts import COACHING_SYSTEM_PROMPT, MEMORY_EXTRACTION_PROMPT, DIARY_PROCESSING_PROMPT
+from agent.models import MemoryExtraction, DiaryProcessing
 from agent.tools import (
     get_active_goals,
     search_memories,
@@ -15,7 +15,10 @@ from agent.tools import (
     get_today_info,
     create_commitment,
     get_pending_commitments,
+    update_commitment_status,
     schedule_followup,
+    search_notes,
+    get_note_by_id,
 )
 from services.llm_manager import get_default_model
 
@@ -36,8 +39,22 @@ def create_coach_agent(model: str | None = None) -> Agent:
             get_today_info,
             create_commitment,
             get_pending_commitments,
+            update_commitment_status,
             schedule_followup,
+            search_notes,
+            get_note_by_id,
         ],
+    )
+
+
+def create_diary_processor(model: str | None = None) -> Agent[None, DiaryProcessing]:
+    """Create an agent for processing diary entries (title generation + memory extraction)."""
+    today = date.today()
+    date_context = f"\n\nToday is {today.isoformat()} ({today.strftime('%A')}). Use this for computing follow-up dates.\n"
+    return Agent(
+        model or get_default_model(),
+        system_prompt=DIARY_PROCESSING_PROMPT + date_context,
+        output_type=DiaryProcessing,
     )
 
 

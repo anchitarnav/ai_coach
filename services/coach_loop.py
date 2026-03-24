@@ -14,6 +14,7 @@ from storage import conversations as conv_db
 from storage import diary as diary_db
 from storage import goals as goals_db
 from storage import memory as memory_db
+from storage import notes as notes_db
 from storage import nudges as nudges_db
 from storage import scheduled_tasks as tasks_db
 from storage import settings as settings_db
@@ -197,6 +198,12 @@ class CoachLoop:
         if entries:
             dl = [f"  - [{e['date']}] {e['mood']}: {e['content'][:150]}" for e in entries]
             parts.append("Recent diary (3 days):\n" + "\n".join(dl))
+
+        # Reference notes (all — persistent reference docs, not time-scoped)
+        notes = await notes_db.get_all(limit=20)
+        if notes:
+            nl = [f"  - [#{n['id']}] {n['title']}: {n['content'][:200]}" for n in notes]
+            parts.append("Reference notes:\n" + "\n".join(nl))
 
         # Fired scheduled tasks
         if fired_tasks:

@@ -28,6 +28,8 @@ async def get_recent(days: int = 14, min_relevance: float = 0.0) -> list[dict]:
 
 async def search(query: str, limit: int = 20) -> list[dict]:
     db = await get_db()
+    # Quote the query so FTS5 treats it as literal tokens, not column references
+    safe_query = '"' + query.replace('"', '""') + '"'
     cursor = await db.execute(
         """SELECT m.*, rank
            FROM memories_fts fts
@@ -35,7 +37,7 @@ async def search(query: str, limit: int = 20) -> list[dict]:
            WHERE memories_fts MATCH ?
            ORDER BY rank
            LIMIT ?""",
-        (query, limit),
+        (safe_query, limit),
     )
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]

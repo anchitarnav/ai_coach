@@ -5,6 +5,7 @@ from pydantic_ai import RunContext
 from storage import goals as goals_db
 from storage import memory as memory_db
 from storage import diary as diary_db
+from storage import notes as notes_db
 from storage import commitments as commitments_db
 from storage import scheduled_tasks as tasks_db
 
@@ -75,6 +76,47 @@ async def create_commitment(ctx: RunContext[None], what: str, due_date: str | No
 async def get_pending_commitments(ctx: RunContext[None]) -> list[dict]:
     """Get the user's pending commitments — things they said they'd do but haven't completed yet."""
     return await commitments_db.get_pending()
+
+
+async def update_commitment_status(ctx: RunContext[None], commitment_id: int, status: str) -> str:
+    """Mark a commitment as done, missed, or cancelled.
+
+    Args:
+        commitment_id: The numeric ID of the commitment to update.
+        status: New status — one of "done", "missed", or "cancelled".
+    """
+    if status == "done":
+        await commitments_db.complete(commitment_id)
+        return f"Commitment #{commitment_id} marked as done."
+    elif status == "missed":
+        await commitments_db.miss(commitment_id)
+        return f"Commitment #{commitment_id} marked as missed."
+    elif status == "cancelled":
+        await commitments_db.cancel(commitment_id)
+        return f"Commitment #{commitment_id} marked as cancelled."
+    else:
+        return f"Invalid status '{status}'. Use 'done', 'missed', or 'cancelled'."
+
+
+async def search_notes(ctx: RunContext[None], query: str) -> list[dict]:
+    """Search the user's reference notes for relevant documents, guidelines, and saved content.
+
+    Notes are persistent reference documents the user has saved — things like HR policies,
+    manager expectations, meeting frameworks, or any content they want the coach to reference.
+
+    Args:
+        query: Search query to find relevant notes.
+    """
+    return await notes_db.search(query, limit=10)
+
+
+async def get_note_by_id(ctx: RunContext[None], note_id: int) -> dict | None:
+    """Retrieve a specific note by its ID number. Users may reference notes by ID like 'note #3'.
+
+    Args:
+        note_id: The numeric ID of the note to retrieve.
+    """
+    return await notes_db.get_by_id(note_id)
 
 
 async def schedule_followup(ctx: RunContext[None], context: str, wake_at: str) -> str:
